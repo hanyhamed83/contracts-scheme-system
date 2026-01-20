@@ -1,0 +1,8 @@
+{
+  "name": "Copy of SchemeFlow Pro",
+  "description": "A sophisticated enterprise management system for processing and analyzing job-related schemes. Features AI-powered summaries, risk assessment, and workflow tracking using Gemini 3 Flash.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
