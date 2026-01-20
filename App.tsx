@@ -6,7 +6,7 @@ import SchemeList from './components/SchemeList';
 import SchemeForm from './components/SchemeForm';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Scheme, SchemeStatus } from './types';
+import { Scheme } from './types';
 import { analyzeScheme, generateGlobalReport } from './services/geminiService';
 import { supabase } from './lib/supabase';
 
@@ -20,23 +20,62 @@ const MainApp: React.FC = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
+  // Helper to get value regardless of key casing from DB response
+  const getVal = (obj: any, key: string) => {
+    if (!obj) return undefined;
+    const lowerKey = key.toLowerCase();
+    // Prioritize exact match, then case-insensitive match
+    if (obj[key] !== undefined) return obj[key];
+    if (obj[lowerKey] !== undefined) return obj[lowerKey];
+    
+    for (const k in obj) {
+      if (k.toLowerCase() === lowerKey) return obj[k];
+    }
+    return undefined;
+  };
+
   const fetchSchemes = useCallback(async () => {
     if (!user) return;
     setIsFetching(true);
     const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from('contracts_schemes')
+      .select('*');
     
     if (error) {
       console.error('Error fetching schemes:', error);
     } else if (data) {
-      const mapped = data.map((item: any) => ({
-        ...item,
-        createdBy: item.created_by,
-        createdAt: item.created_at,
-        aiInsight: item.ai_insight
-      }));
+      const mapped = data.map((item: any) => {
+        const Job_no = getVal(item, 'Job_no') || getVal(item, 'job_no') || '';
+        return {
+          contractorRemarks: getVal(item, 'contractorRemarks') || getVal(item, 'contractorremarks'),
+          Rcvd_Date: getVal(item, 'Rcvd_Date') || getVal(item, 'rcvd_date'),
+          Sch_Ref: getVal(item, 'Sch_Ref') || getVal(item, 'sch_ref'),
+          Job_no: Job_no,
+          APPNUMBER: getVal(item, 'APPNUMBER') || getVal(item, 'appnumber'),
+          BLK: getVal(item, 'BLK') || getVal(item, 'blk'),
+          SUPERVISOR: getVal(item, 'SUPERVISOR') || getVal(item, 'supervisor'),
+          Contractor_Name: getVal(item, 'Contractor_Name') || getVal(item, 'contractor_name'),
+          Title1: getVal(item, 'Title1') || getVal(item, 'title1'),
+          STATUS: getVal(item, 'STATUS') || getVal(item, 'status') || 'N/A',
+          DATE_OF_COMPLETED: getVal(item, 'DATE_OF_COMPLETED') || getVal(item, 'date_of_completed'),
+          NUMBEROFSS: getVal(item, 'NUMBEROFSS') || getVal(item, 'numberofss'),
+          APPSTATUS: getVal(item, 'APPSTATUS') || getVal(item, 'appstatus'),
+          REMARKS: getVal(item, 'REMARKS') || getVal(item, 'remarks'),
+          DATEOFMEASUREMENT: getVal(item, 'DATEOFMEASUREMENT') || getVal(item, 'dateofmeasurement'),
+          CONTRACTORAPPRAISAL: getVal(item, 'CONTRACTORAPPRAISAL') || getVal(item, 'contractorappraisal'),
+          AREA: getVal(item, 'AREA') || getVal(item, 'area'),
+          TYPE: getVal(item, 'TYPE') || getVal(item, 'type'),
+          labCost: getVal(item, 'labCost') || getVal(item, 'labcost'),
+          matCost: getVal(item, 'matCost') || getVal(item, 'matcost'),
+          PO_NUMBER: getVal(item, 'PO_NUMBER') || getVal(item, 'po_number'),
+          UserID: getVal(item, 'UserID') || getVal(item, 'userid'),
+          IO: getVal(item, 'IO') || getVal(item, 'io'),
+          IUWR_NUMBER: getVal(item, 'IUWR_NUMBER') || getVal(item, 'iuwr_number'),
+          totalCost: getVal(item, 'totalCost') || getVal(item, 'totalcost') || '0.000',
+          id: Job_no || Math.random().toString(36).substr(2, 9),
+          aiInsight: getVal(item, 'REMARKS') || getVal(item, 'remarks')
+        };
+      });
       setSchemes(mapped);
     }
     setIsFetching(false);
@@ -46,16 +85,12 @@ const MainApp: React.FC = () => {
     if (isAuthenticated) {
       fetchSchemes();
 
-      // Real-time subscription
       const channel = supabase
-        .channel('schema_db_changes')
+        .channel('contracts_db_changes_final')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'schemes' },
-          (payload) => {
-            console.log('Real-time update received:', payload);
-            fetchSchemes(); // Re-fetch all to ensure order and relations are correct
-          }
+          { event: '*', schema: 'public', table: 'contracts_schemes' },
+          () => fetchSchemes()
         )
         .subscribe();
 
@@ -70,7 +105,7 @@ const MainApp: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-medium animate-pulse">Initializing System...</p>
+          <p className="text-slate-400 font-medium animate-pulse">Synchronizing Records...</p>
         </div>
       </div>
     );
@@ -80,73 +115,84 @@ const MainApp: React.FC = () => {
     return <Login />;
   }
 
-  const handleAddOrUpdateScheme = async (schemeData: Omit<Scheme, 'id' | 'createdAt'>) => {
+  const handleAddOrUpdateScheme = async (schemeData: Partial<Scheme>) => {
     if (!user) return;
     
-    if (editingScheme) {
-      const { error } = await supabase
-        .from('schemes')
-        .update({
-          title: schemeData.title,
-          description: schemeData.description,
-          status: schemeData.status,
-          priority: schemeData.priority,
-          category: schemeData.category,
-          budget: schemeData.budget
-        })
-        .eq('id', editingScheme.id);
+    // CRITICAL FIX: PostgreSQL usually lowercases column names in Supabase.
+    // We map the UI keys to lowercase database keys to satisfy the schema cache.
+    const dbPayload: any = {
+      contractorremarks: schemeData.contractorRemarks,
+      rcvd_date: schemeData.Rcvd_Date,
+      sch_ref: schemeData.Sch_Ref,
+      job_no: schemeData.Job_no,
+      appnumber: schemeData.APPNUMBER,
+      blk: schemeData.BLK,
+      supervisor: schemeData.SUPERVISOR,
+      contractor_name: schemeData.Contractor_Name,
+      title1: schemeData.Title1,
+      status: schemeData.STATUS,
+      date_of_completed: schemeData.DATE_OF_COMPLETED,
+      numberofss: schemeData.NUMBEROFSS,
+      appstatus: schemeData.APPSTATUS,
+      remarks: schemeData.REMARKS,
+      dateofmeasurement: schemeData.DATEOFMEASUREMENT,
+      contractorappraisal: schemeData.CONTRACTORAPPRAISAL,
+      area: schemeData.AREA,
+      type: schemeData.TYPE,
+      labcost: schemeData.labCost,
+      matcost: schemeData.matCost,
+      po_number: schemeData.PO_NUMBER,
+      userid: user.id,
+      io: schemeData.IO,
+      iuwr_number: schemeData.IUWR_NUMBER,
+      totalcost: schemeData.totalCost
+    };
 
-      if (error) {
-        console.error('Error updating scheme:', error);
-        alert('Failed to update scheme.');
-      }
-    } else {
-      const { error } = await supabase
-        .from('schemes')
-        .insert([
-          {
-            title: schemeData.title,
-            description: schemeData.description,
-            status: schemeData.status,
-            priority: schemeData.priority,
-            category: schemeData.category,
-            budget: schemeData.budget,
-            created_by: user.id
-          }
-        ]);
+    try {
+      if (editingScheme) {
+        const { error } = await supabase
+          .from('contracts_schemes')
+          .update(dbPayload)
+          .eq('job_no', editingScheme.Job_no);
 
-      if (error) {
-        console.error('Error adding scheme:', error);
-        alert('Failed to save scheme.');
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('contracts_schemes')
+          .insert([dbPayload]);
+
+        if (error) throw error;
       }
+      
+      await fetchSchemes();
+      setIsFormOpen(false);
+      setEditingScheme(null);
+    } catch (error: any) {
+      console.error('Supabase Save Error:', error);
+      alert('Save Failed: ' + (error.message || 'Check database schema compatibility.'));
     }
-    
-    setEditingScheme(null);
-    setIsFormOpen(false);
   };
 
-  const handleUpdateStatus = async (id: string, status: SchemeStatus) => {
+  const handleUpdateStatus = async (jobNo: string, status: string) => {
     const { error } = await supabase
-      .from('schemes')
-      .update({ status })
-      .eq('id', id);
+      .from('contracts_schemes')
+      .update({ status: status })
+      .eq('job_no', jobNo);
 
-    if (error) {
-      console.error('Error updating status:', error);
-    }
+    if (error) console.error('Status Update Error:', error);
+    else await fetchSchemes();
   };
 
-  const handleDeleteScheme = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this scheme?')) return;
+  const handleDeleteScheme = async (jobNo: string) => {
+    if (!confirm(`Delete scheme ${jobNo}? This action is irreversible.`)) return;
     
     const { error } = await supabase
-      .from('schemes')
+      .from('contracts_schemes')
       .delete()
-      .eq('id', id);
+      .eq('job_no', jobNo);
 
-    if (error) {
-      console.error('Error deleting scheme:', error);
-    }
+    if (error) console.error('Delete Error:', error);
+    else await fetchSchemes();
   };
 
   const handleEditTrigger = (scheme: Scheme) => {
@@ -154,28 +200,28 @@ const MainApp: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleAnalyzeScheme = async (id: string) => {
-    const targetScheme = schemes.find(s => s.id === id);
+  const handleAnalyzeScheme = async (jobNo: string) => {
+    const targetScheme = schemes.find(s => s.Job_no === jobNo);
     if (!targetScheme) return;
 
-    setSchemes(prev => prev.map(s => s.id === id ? { ...s, isAnalyzing: true } : s));
+    setSchemes(prev => prev.map(s => s.Job_no === jobNo ? { ...s, isAnalyzing: true } : s));
 
     try {
       const result = await analyzeScheme(targetScheme);
       
       const { error } = await supabase
-        .from('schemes')
+        .from('contracts_schemes')
         .update({ 
-          ai_insight: result.summary,
-          priority: result.suggestedPriority 
+          remarks: `[AI Analysis]: ${result.summary}`,
+          appstatus: result.suggestedStatus
         })
-        .eq('id', id);
-
+        .eq('job_no', jobNo);
+      
       if (error) throw error;
-      // Real-time will trigger the fetch
+      await fetchSchemes();
     } catch (error) {
       console.error("AI Analysis failed", error);
-      setSchemes(prev => prev.map(s => s.id === id ? { ...s, isAnalyzing: false } : s));
+      setSchemes(prev => prev.map(s => s.Job_no === jobNo ? { ...s, isAnalyzing: false } : s));
     }
   };
 
@@ -198,28 +244,16 @@ const MainApp: React.FC = () => {
       {activeTab === 'schemes' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="flex justify-between items-center">
-            <div className="animate-slideInLeft">
-              <h2 className="text-2xl font-bold text-slate-800">Operational Pipeline</h2>
-              <p className="text-slate-500 text-sm">Monitor and manage all active job schemes.</p>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Contract Pipeline</h2>
+              <p className="text-slate-500 text-sm">Processing {schemes.length} industrial job records.</p>
             </div>
             <div className="flex gap-4">
-              {isFetching && (
-                <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-full animate-pulse">
-                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
-                  Database Syncing
-                </div>
-              )}
               <button
-                onClick={() => {
-                  setEditingScheme(null);
-                  setIsFormOpen(true);
-                }}
-                className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-lg shadow-indigo-200 flex items-center gap-2 animate-scaleIn"
+                onClick={() => { setEditingScheme(null); setIsFormOpen(true); }}
+                className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 transition-all"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                New Scheme
+                New Entry
               </button>
             </div>
           </div>
@@ -237,40 +271,23 @@ const MainApp: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
            <div className="bg-slate-900 rounded-3xl p-10 text-white relative overflow-hidden group">
               <div className="relative z-10">
-                <h2 className="text-3xl font-bold mb-4 animate-slideUp">Strategic AI Intelligence</h2>
-                <p className="text-slate-400 max-w-lg mb-8 animate-slideUp" style={{ animationDelay: '100ms' }}>
-                  Leverage Gemini 3 to synthesize all current schemes into a cohesive organizational report. 
-                  Identify risks before they manifest and optimize resource allocation.
+                <h2 className="text-3xl font-bold mb-4">Strategic Synthesis</h2>
+                <p className="text-slate-400 max-w-lg mb-8">
+                  AI-driven audit of all contract remarks, job statuses, and resource allocations.
                 </p>
                 <button
                   onClick={handleGenerateReport}
                   disabled={isGeneratingReport}
-                  className="px-8 py-4 bg-white text-slate-900 font-bold rounded-2xl hover:bg-slate-100 hover:scale-[1.05] active:scale-[0.95] transition-all duration-300 flex items-center gap-3 disabled:opacity-50 animate-slideUp"
-                  style={{ animationDelay: '200ms' }}
+                  className="px-8 py-4 bg-white text-slate-900 font-bold rounded-2xl hover:scale-[1.05] transition-all disabled:opacity-50"
                 >
-                  {isGeneratingReport ? (
-                    <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                       <span>Processing Intelligence...</span>
-                    </div>
-                  ) : 'Generate Executive Summary'}
-                  {!isGeneratingReport && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600 group-hover:animate-bounce" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 112 0v1a1 1 0 11-2 0zM13.243 14.657a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM6.464 14.95a1 1 0 11-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707z" />
-                    </svg>
-                  )}
+                  {isGeneratingReport ? 'Compiling Intelligence...' : 'Generate Executive Report'}
                 </button>
-              </div>
-              <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-                 <svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#6366F1" d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,79.6,-46.2C87.4,-33.3,90,-16.6,89.1,-0.5C88.2,15.6,83.7,31.2,75.4,44.2C67,57.2,54.7,67.6,40.7,74.5C26.6,81.4,10.8,84.9,-4.1,91.9C-19,99,-32.9,109.6,-45.5,106.4C-58.1,103.2,-69.4,86.2,-78.4,70.5C-87.3,54.8,-93.8,40.5,-95.1,25.8C-96.5,11.1,-92.6,-4,-88.4,-18.2C-84.2,-32.4,-79.6,-45.7,-70.5,-55.9C-61.4,-66.1,-47.8,-73.2,-34.5,-79.5C-21.2,-85.8,-8.1,-91.3,4.2,-98.6C16.5,-105.9,30.6,-83.6,44.7,-76.4Z" transform="translate(100 100)" />
-                 </svg>
               </div>
            </div>
 
            {globalReport && (
-             <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-100 prose prose-slate max-w-none animate-scaleIn">
-                <h3 className="text-2xl font-bold text-slate-800 mb-6">Pipeline Synthesis</h3>
+             <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-100 animate-scaleIn">
+                <h3 className="text-2xl font-bold text-slate-800 mb-6">Pipeline Audit</h3>
                 <div className="whitespace-pre-wrap text-slate-600 leading-relaxed font-medium">
                   {globalReport}
                 </div>
@@ -283,50 +300,9 @@ const MainApp: React.FC = () => {
         <SchemeForm 
           initialData={editingScheme || undefined}
           onAdd={handleAddOrUpdateScheme}
-          onClose={() => {
-            setIsFormOpen(false);
-            setEditingScheme(null);
-          }}
+          onClose={() => { setIsFormOpen(false); setEditingScheme(null); }}
         />
       )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-15px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideInLeft {
-          from { opacity: 0; transform: translateX(-40px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.92); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -1000px 0; }
-          100% { background-position: 1000px 0; }
-        }
-        .animate-fadeIn { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-slideUp { animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-slideDown { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-slideInLeft { animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-scaleIn { animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        
-        .shimmer {
-          background: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
-          background-size: 1000px 100%;
-          animation: shimmer 2s infinite linear;
-        }
-      `}</style>
     </Layout>
   );
 };
