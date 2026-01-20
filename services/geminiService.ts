@@ -1,8 +1,8 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Scheme, AISchemeAnalysis, SchemePriority } from "../types";
+import { Scheme, AISchemeAnalysis } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 export const analyzeScheme = async (scheme: Scheme): Promise<AISchemeAnalysis> => {
   const response = await ai.models.generateContent({
@@ -41,7 +41,8 @@ export const analyzeScheme = async (scheme: Scheme): Promise<AISchemeAnalysis> =
     }
   });
 
-  const analysis = JSON.parse(response.text);
+  const text = response.text || '{}';
+  const analysis = JSON.parse(text);
   return analysis as AISchemeAnalysis;
 };
 
@@ -54,5 +55,5 @@ export const generateGlobalReport = async (schemes: Scheme[]): Promise<string> =
     contents: prompt
   });
 
-  return response.text;
+  return response.text || 'Unable to generate report at this time.';
 };

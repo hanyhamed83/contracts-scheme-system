@@ -6,7 +6,7 @@ import SchemeList from './components/SchemeList';
 import SchemeForm from './components/SchemeForm';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Scheme, SchemeStatus, SchemePriority, SchemeCategory } from './types';
+import { Scheme, SchemeStatus } from './types';
 import { analyzeScheme, generateGlobalReport } from './services/geminiService';
 import { supabase } from './lib/supabase';
 

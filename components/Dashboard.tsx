@@ -62,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ schemes }) => {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]} animationDuration={1500} animationBegin={800}>
-                  {statusData.map((entry, index) => (
+                  {statusData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
@@ -91,7 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({ schemes }) => {
                   animationDuration={1500}
                   animationBegin={1000}
                 >
-                  {statusData.map((entry, index) => (
+                  {statusData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
