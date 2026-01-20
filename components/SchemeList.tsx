@@ -140,24 +140,27 @@ const SchemeList: React.FC<SchemeListProps> = ({ schemes, onAnalyze, onUpdateSta
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
                           </button>
-                          <div className="absolute right-0 top-full mt-1 hidden group-hover/dropdown:block bg-white border border-slate-200 rounded-xl shadow-xl p-2 min-w-[160px] z-20 animate-slideDown">
-                            <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">Update Status</div>
-                            {Object.values(SchemeStatus).map(st => (
-                              <button
-                                key={st}
-                                onClick={() => onUpdateStatus(scheme.id, st)}
-                                className="w-full text-left px-3 py-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-xs font-medium text-slate-600 transition-colors"
-                              >
-                                {st}
-                              </button>
-                            ))}
-                            <div className="border-t border-slate-50 mt-1 pt-1">
-                              <button
-                                onClick={() => onDelete(scheme.id)}
-                                className="w-full text-left px-3 py-2 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-xs font-bold text-slate-600 transition-colors"
-                              >
-                                Delete Scheme
-                              </button>
+                          {/* The absolute container now has pt-2 to bridge the gap and uses visibility/opacity for smooth hover */}
+                          <div className="absolute right-0 top-full pt-2 invisible opacity-0 group-hover/dropdown:visible group-hover/dropdown:opacity-100 transition-all duration-200 z-20 min-w-[160px]">
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-2 animate-slideDown">
+                              <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">Update Status</div>
+                              {Object.values(SchemeStatus).map(st => (
+                                <button
+                                  key={st}
+                                  onClick={() => onUpdateStatus(scheme.id, st)}
+                                  className="w-full text-left px-3 py-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-xs font-medium text-slate-600 transition-colors"
+                                >
+                                  {st}
+                                </button>
+                              ))}
+                              <div className="border-t border-slate-50 mt-1 pt-1">
+                                <button
+                                  onClick={() => onDelete(scheme.id)}
+                                  className="w-full text-left px-3 py-2 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-xs font-bold text-slate-600 transition-colors"
+                                >
+                                  Delete Scheme
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
